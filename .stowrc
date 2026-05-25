@@ -1,4 +1,5 @@
 --ignore='\.DS_Store'
 --ignore='\.git'
 --ignore='\.stowrc'
---ignore='force_stow.sh'
+--ignore='force_stow\.sh'
+--ignore='.*\.bakfs$'
