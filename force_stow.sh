@@ -5,33 +5,14 @@ set -euo pipefail
 # force_stow
 # =========================================================
 #
-# Usage:
-#   force_stow package
-#   force_stow package1 package2
-#   force_stow .
-#   force_stow -d package
-#   force_stow -d .
-#   force_stow -r package
-#   force_stow -r .
-#
-# Examples:
-#   force_stow zsh
-#   force_stow zsh nvim
-#   force_stow .
-#   force_stow -d nvim
-#   force_stow -r zsh
-#   force_stow -r .
-#
-# Requirements:
-#   - GNU stow installed and available in PATH
-#   - run from inside your dotfiles root
-#
 # Behavior:
-#   - backups conflicting targets as *.bakfs before stowing
-#   - with -d: conflicting targets are deleted instead
-#   - with -r: unstows package(s) and restores *.bakfs backups
-#   - supports one package, many packages, or all packages via '.'
-#   - ignores files matching .stowrc ignore rules
+#   - backs up conflicting FILES as *.bakfs
+#   - never backs up parent directories
+#   - preserves existing directory trees
+#   - lets GNU Stow merge directories naturally
+#   - supports delete mode (-d)
+#   - supports restore mode (-r)
+#   - respects .stowrc ignore rules
 #
 # =========================================================
 
@@ -80,6 +61,11 @@ if ! command -v stow >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v realpath >/dev/null 2>&1; then
+  echo "ERROR: realpath is required"
+  exit 1
+fi
+
 # =========================================================
 # Parse .stowrc ignore rules
 # =========================================================
@@ -120,7 +106,7 @@ PACKAGES=()
 if printf '%s
 ' "${PACKAGES_INPUT[@]}" | grep -qx '\.'; then
 
-  while IFS= read -r dir; do
+  while IFS= read -r -d '' dir; do
 
     base="$(basename "$dir")"
 
@@ -130,7 +116,7 @@ if printf '%s
 
     PACKAGES+=("$base")
 
-  done < <(find "$DOTFILES_ROOT" -mindepth 1 -maxdepth 1 -type d)
+  done < <(find "$DOTFILES_ROOT" -mindepth 1 -maxdepth 1 -type d -print0)
 
 else
 
@@ -166,7 +152,7 @@ if [ "$RESTORE_MODE" -eq 1 ]; then
 
     stow -D "$PACKAGE"
 
-    find "$PACKAGE_PATH" -mindepth 1 | while read -r source_path; do
+    find "$PACKAGE_PATH" \( -type f -o -type l \) | while read -r source_path; do
 
       rel_path="${source_path#$PACKAGE_PATH/}"
       target_path="$TARGET_ROOT/$rel_path"
@@ -177,9 +163,10 @@ if [ "$RESTORE_MODE" -eq 1 ]; then
       fi
 
       if [ -e "$backup_path" ] || [ -L "$backup_path" ]; then
+
         echo "Restoring: $backup_path -> $target_path"
 
-        rm -rf "$target_path"
+        rm -f "$target_path"
         mv "$backup_path" "$target_path"
       fi
 
@@ -193,7 +180,7 @@ if [ "$RESTORE_MODE" -eq 1 ]; then
 fi
 
 # =========================================================
-# Remove or backup conflicting targets
+# Backup/remove conflicting FILES only
 # =========================================================
 
 for PACKAGE in "${PACKAGES[@]}"; do
@@ -205,7 +192,7 @@ for PACKAGE in "${PACKAGES[@]}"; do
   echo "Processing package: $PACKAGE"
   echo "========================================================="
 
-  find "$PACKAGE_PATH" -mindepth 1 | while read -r source_path; do
+  find "$PACKAGE_PATH" \( -type f -o -type l \) | while read -r source_path; do
 
     rel_path="${source_path#$PACKAGE_PATH/}"
     target_path="$TARGET_ROOT/$rel_path"
@@ -215,32 +202,81 @@ for PACKAGE in "${PACKAGES[@]}"; do
       continue
     fi
 
-    # Skip if target doesn't exist
+    source_is_file=0
+    source_is_dir=0
+
+    [ -f "$source_path" ] && source_is_file=1
+    [ -d "$source_path" ] && source_is_dir=1
+
+    # =====================================================
+    # Validate parent directories
+    # =====================================================
+
+    parent="$(dirname "$target_path")"
+
+    while [ "$parent" != "$TARGET_ROOT" ] && [ "$parent" != "/" ]; do
+
+      if [ -f "$parent" ] || [ -L "$parent" ]; then
+        echo "ERROR: Cannot create directory structure because this exists as a file:"
+        echo "  $parent"
+        exit 1
+      fi
+
+      parent="$(dirname "$parent")"
+
+    done
+
+    # =====================================================
+    # No conflict
+    # =====================================================
+
     if [ ! -e "$target_path" ] && [ ! -L "$target_path" ]; then
       continue
     fi
 
-    # Skip if already correct symlink
-    if [ -L "$target_path" ]; then
-      resolved="$(readlink "$target_path")"
+    # =====================================================
+    # Already correct symlink
+    # =====================================================
 
-      if [ "$resolved" = "$source_path" ]; then
+    if [ -L "$target_path" ]; then
+
+      resolved_target="$(realpath "$target_path")"
+      resolved_source="$(realpath "$source_path")"
+
+      if [ "$resolved_target" = "$resolved_source" ]; then
         echo "Already linked: $target_path"
         continue
       fi
     fi
 
+    # =====================================================
+    # File/dir structural conflicts
+    # =====================================================
+
+    if [ -d "$target_path" ]; then
+      echo "ERROR: Directory conflicts with file target:"
+      echo "  $target_path"
+      exit 1
+    fi
+
+    # =====================================================
     # Delete mode
+    # =====================================================
+
     if [ "$DELETE_MODE" -eq 1 ]; then
+
       echo "Removing: $target_path"
-      rm -rf "$target_path"
+      rm -f "$target_path"
+
     else
+
       backup_path="${target_path}.bakfs"
 
       echo "Backing up: $target_path -> $backup_path"
 
-      rm -rf "$backup_path"
+      rm -f "$backup_path"
       mv "$target_path" "$backup_path"
+
     fi
 
   done
@@ -250,7 +286,7 @@ for PACKAGE in "${PACKAGES[@]}"; do
 
   stow "$PACKAGE"
 
- done
+done
 
 # =========================================================
 # Finished
