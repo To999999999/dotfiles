@@ -1,296 +1,292 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
 
-# =========================================================
-# force_stow
-# =========================================================
-#
-# Behavior:
-#   - backs up conflicting FILES as *.bakfs
-#   - never backs up parent directories
-#   - preserves existing directory trees
-#   - lets GNU Stow merge directories naturally
-#   - supports delete mode (-d)
-#   - supports restore mode (-r)
-#   - respects .stowrc ignore rules
-#
-# =========================================================
-
-DELETE_MODE=0
-RESTORE_MODE=0
+BACKUP_EXT=".bakfs"
+DELETE_MODE=false
+RESTORE_MODE=false
 
 usage() {
-  echo "Usage: force_stow [-d|-r] package [package2 ...] | ."
-  exit 1
+    cat <<EOF
+Usage:
+  force_stow [options] package1 [package2 ...]
+  force_stow [options] .
+
+Options:
+  -d    Delete conflicting files instead of backing them up
+  -r    Reverse operation (unstow + restore backups)
+  -h    Show this help
+
+Examples:
+  force_stow zsh
+  force_stow zsh nvim tmux
+  force_stow .
+  force_stow -d zsh
+  force_stow -r zsh
+  force_stow -r .
+EOF
 }
 
-while getopts ":dr" opt; do
-  case "$opt" in
-    d)
-      DELETE_MODE=1
-      ;;
-    r)
-      RESTORE_MODE=1
-      ;;
-    *)
-      usage
-      ;;
-  esac
+########################################
+# Parse options
+########################################
+
+while getopts ":drh" opt; do
+    case "$opt" in
+        d)
+            DELETE_MODE=true
+            ;;
+        r)
+            RESTORE_MODE=true
+            ;;
+        h)
+            usage
+            exit 0
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
 done
 
 shift $((OPTIND - 1))
 
-PACKAGES_INPUT=("$@")
+########################################
+# Validation
+########################################
 
-[ ${#PACKAGES_INPUT[@]} -eq 0 ] && usage
-
-if [ "$DELETE_MODE" -eq 1 ] && [ "$RESTORE_MODE" -eq 1 ]; then
-  echo "ERROR: -d and -r are mutually exclusive"
-  exit 1
+if [[ "$DELETE_MODE" == true && "$RESTORE_MODE" == true ]]; then
+    echo "Error: -d and -r cannot be used together."
+    exit 1
 fi
 
-DOTFILES_ROOT="$(pwd)"
-TARGET_ROOT="$HOME"
-
-# =========================================================
-# Dependency checks
-# =========================================================
+if [[ $# -eq 0 ]]; then
+    usage
+    exit 1
+fi
 
 if ! command -v stow >/dev/null 2>&1; then
-  echo "ERROR: GNU Stow is not installed or not in PATH"
-  exit 1
+    echo "Error: GNU Stow is not installed."
+    exit 1
 fi
 
-if ! command -v realpath >/dev/null 2>&1; then
-  echo "ERROR: realpath is required"
-  exit 1
+if [[ ! -f ".stowrc" ]]; then
+    echo "Warning: no .stowrc found in current directory."
 fi
 
-# =========================================================
-# Parse .stowrc ignore rules
-# =========================================================
+########################################
+# We assume the classic setup:
+#
+#   ~/dotfiles/package/...files...
+#
+# and stow targets the parent directory.
+########################################
+
+DOTFILES_DIR="$(pwd)"
+TARGET_DIR="$(realpath ..)"
+
+########################################
+# Read ignore rules from .stowrc
+#
+# Supports lines like:
+#   --ignore='regex'
+#   --ignore="regex"
+#   --ignore=regex
+########################################
 
 IGNORE_PATTERNS=()
 
-if [ -f "$DOTFILES_ROOT/.stowrc" ]; then
-  while IFS= read -r line; do
+load_ignore_patterns() {
+    [[ -f ".stowrc" ]] || return
 
-    if [[ "$line" =~ --ignore=\'(.*)\' ]]; then
-      IGNORE_PATTERNS+=("${BASH_REMATCH[1]}")
-    fi
+    while IFS= read -r line; do
+        [[ "$line" =~ --ignore= ]] || continue
 
-  done < "$DOTFILES_ROOT/.stowrc"
-fi
+        pattern="${line#*--ignore=}"
 
-should_ignore() {
-  local path="$1"
-  local base
+        # trim surrounding quotes
+        pattern="${pattern%\"}"
+        pattern="${pattern#\"}"
+        pattern="${pattern%\'}"
+        pattern="${pattern#\'}"
 
-  base="$(basename "$path")"
-
-  for pattern in "${IGNORE_PATTERNS[@]}"; do
-    if [[ "$base" =~ $pattern ]]; then
-      return 0
-    fi
-  done
-
-  return 1
+        IGNORE_PATTERNS+=("$pattern")
+    done < .stowrc
 }
 
-# =========================================================
-# Determine package list
-# =========================================================
+########################################
+# Check if relative path is ignored
+########################################
 
-PACKAGES=()
+is_ignored() {
+    local rel="$1"
 
-if printf '%s
-' "${PACKAGES_INPUT[@]}" | grep -qx '\.'; then
+    for pattern in "${IGNORE_PATTERNS[@]}"; do
+        if [[ "$rel" =~ $pattern ]]; then
+            return 0
+        fi
+    done
 
-  while IFS= read -r -d '' dir; do
+    return 1
+}
 
-    base="$(basename "$dir")"
+########################################
+# Expand '.' into all package dirs
+########################################
 
-    if should_ignore "$base"; then
-      continue
+expand_packages() {
+    local input=("$@")
+    local output=()
+
+    if [[ " ${input[*]} " == *" . "* ]]; then
+        while IFS= read -r dir; do
+            output+=("$dir")
+        done < <(
+            find . \
+                -mindepth 1 \
+                -maxdepth 1 \
+                -type d \
+                ! -name '.git' \
+                ! -name '.stow-cache' \
+                -printf '%f\n' \
+                | sort
+        )
+    else
+        output=("${input[@]}")
     fi
 
-    PACKAGES+=("$base")
+    printf '%s\n' "${output[@]}"
+}
 
-  done < <(find "$DOTFILES_ROOT" -mindepth 1 -maxdepth 1 -type d -print0)
+########################################
+# Find all real files in a package
+# respecting ignore rules.
+########################################
 
-else
+package_files() {
+    local pkg="$1"
 
-  for PACKAGE in "${PACKAGES_INPUT[@]}"; do
+    find "$pkg" -type f | while IFS= read -r file; do
+        rel="${file#${pkg}/}"
 
-    PACKAGE_PATH="$DOTFILES_ROOT/$PACKAGE"
+        if is_ignored "$rel"; then
+            continue
+        fi
 
-    if [ ! -d "$PACKAGE_PATH" ]; then
-      echo "ERROR: package '$PACKAGE' does not exist"
-      exit 1
-    fi
+        printf '%s\n' "$rel"
+    done
+}
 
-    PACKAGES+=("$PACKAGE")
+########################################
+# Backup or delete conflicts
+########################################
 
-  done
-
-fi
-
-# =========================================================
-# Restore mode
-# =========================================================
-
-if [ "$RESTORE_MODE" -eq 1 ]; then
-
-  for PACKAGE in "${PACKAGES[@]}"; do
-
-    PACKAGE_PATH="$DOTFILES_ROOT/$PACKAGE"
+process_package_apply() {
+    local pkg="$1"
 
     echo
-    echo "========================================================="
-    echo "Restoring package: $PACKAGE"
-    echo "========================================================="
+    echo "=== Processing package: $pkg ==="
 
-    stow -D "$PACKAGE"
+    if [[ ! -d "$pkg" ]]; then
+        echo "Warning: package '$pkg' does not exist. Skipping."
+        return
+    fi
 
-    find "$PACKAGE_PATH" \( -type f -o -type l \) | while read -r source_path; do
+    while IFS= read -r relpath; do
+        src="$DOTFILES_DIR/$pkg/$relpath"
+        dst="$TARGET_DIR/$relpath"
 
-      rel_path="${source_path#$PACKAGE_PATH/}"
-      target_path="$TARGET_ROOT/$rel_path"
-      backup_path="${target_path}.bakfs"
+        [[ -f "$src" ]] || continue
 
-      if should_ignore "$source_path"; then
-        continue
-      fi
+        if [[ -e "$dst" && ! -L "$dst" ]]; then
+            if [[ "$DELETE_MODE" == true ]]; then
+                echo "Deleting: $dst"
+                rm -f "$dst"
+            else
+                backup="$dst$BACKUP_EXT"
 
-      if [ -e "$backup_path" ] || [ -L "$backup_path" ]; then
+                if [[ -e "$backup" ]]; then
+                    echo "Backup already exists, skipping: $backup"
+                    continue
+                fi
 
-        echo "Restoring: $backup_path -> $target_path"
+                echo "Backing up: $dst -> $backup"
+                mv "$dst" "$backup"
+            fi
+        fi
+    done < <(package_files "$pkg")
+}
 
-        rm -f "$target_path"
-        mv "$backup_path" "$target_path"
-      fi
+########################################
+# Restore backups
+########################################
 
-    done
+process_package_restore() {
+    local pkg="$1"
 
-  done
+    echo
+    echo "=== Restoring package: $pkg ==="
 
-  echo
-  echo "Done."
-  exit 0
+    if [[ ! -d "$pkg" ]]; then
+        echo "Warning: package '$pkg' does not exist. Skipping."
+        return
+    fi
+
+    while IFS= read -r relpath; do
+        dst="$TARGET_DIR/$relpath"
+        backup="$dst$BACKUP_EXT"
+
+        if [[ -e "$backup" ]]; then
+            echo "Restoring: $backup -> $dst"
+            mv "$backup" "$dst"
+        fi
+    done < <(package_files "$pkg")
+}
+
+########################################
+# Main
+########################################
+
+load_ignore_patterns
+
+mapfile -t PACKAGES < <(expand_packages "$@")
+
+if [[ ${#PACKAGES[@]} -eq 0 ]]; then
+    echo "No packages found."
+    exit 1
 fi
 
-# =========================================================
-# Backup/remove conflicting FILES only
-# =========================================================
+########################################
+# Reverse mode
+########################################
 
-for PACKAGE in "${PACKAGES[@]}"; do
+if [[ "$RESTORE_MODE" == true ]]; then
+    echo
+    echo "=== Removing stow symlinks ==="
 
-  PACKAGE_PATH="$DOTFILES_ROOT/$PACKAGE"
+    stow -D "${PACKAGES[@]}"
 
-  echo
-  echo "========================================================="
-  echo "Processing package: $PACKAGE"
-  echo "========================================================="
-
-  find "$PACKAGE_PATH" \( -type f -o -type l \) | while read -r source_path; do
-
-    rel_path="${source_path#$PACKAGE_PATH/}"
-    target_path="$TARGET_ROOT/$rel_path"
-
-    if should_ignore "$source_path"; then
-      echo "Ignoring: $rel_path"
-      continue
-    fi
-
-    source_is_file=0
-    source_is_dir=0
-
-    [ -f "$source_path" ] && source_is_file=1
-    [ -d "$source_path" ] && source_is_dir=1
-
-    # =====================================================
-    # Validate parent directories
-    # =====================================================
-
-    parent="$(dirname "$target_path")"
-
-    while [ "$parent" != "$TARGET_ROOT" ] && [ "$parent" != "/" ]; do
-
-      if [ -f "$parent" ] || [ -L "$parent" ]; then
-        echo "ERROR: Cannot create directory structure because this exists as a file:"
-        echo "  $parent"
-        exit 1
-      fi
-
-      parent="$(dirname "$parent")"
-
+    for pkg in "${PACKAGES[@]}"; do
+        process_package_restore "$pkg"
     done
 
-    # =====================================================
-    # No conflict
-    # =====================================================
+    echo
+    echo "Done."
+    exit 0
+fi
 
-    if [ ! -e "$target_path" ] && [ ! -L "$target_path" ]; then
-      continue
-    fi
+########################################
+# Normal mode
+########################################
 
-    # =====================================================
-    # Already correct symlink
-    # =====================================================
-
-    if [ -L "$target_path" ]; then
-
-      resolved_target="$(realpath "$target_path")"
-      resolved_source="$(realpath "$source_path")"
-
-      if [ "$resolved_target" = "$resolved_source" ]; then
-        echo "Already linked: $target_path"
-        continue
-      fi
-    fi
-
-    # =====================================================
-    # File/dir structural conflicts
-    # =====================================================
-
-    if [ -d "$target_path" ]; then
-      echo "ERROR: Directory conflicts with file target:"
-      echo "  $target_path"
-      exit 1
-    fi
-
-    # =====================================================
-    # Delete mode
-    # =====================================================
-
-    if [ "$DELETE_MODE" -eq 1 ]; then
-
-      echo "Removing: $target_path"
-      rm -f "$target_path"
-
-    else
-
-      backup_path="${target_path}.bakfs"
-
-      echo "Backing up: $target_path -> $backup_path"
-
-      rm -f "$backup_path"
-      mv "$target_path" "$backup_path"
-
-    fi
-
-  done
-
-  echo
-  echo "Running: stow $PACKAGE"
-
-  stow "$PACKAGE"
-
+for pkg in "${PACKAGES[@]}"; do
+    process_package_apply "$pkg"
 done
 
-# =========================================================
-# Finished
-# =========================================================
+echo
+echo "=== Running stow ==="
+stow "${PACKAGES[@]}"
 
 echo
 echo "Done."
