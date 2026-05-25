@@ -3,3 +3,4 @@
 --ignore='\.stowrc'
 --ignore='force_stow\.sh'
 --ignore='.*\.bakfs$'
+--ignore='README\.md'
