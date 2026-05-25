@@ -1,0 +1,28 @@
+return {
+	{
+		"jackMort/ChatGPT.nvim",
+		event = "VeryLazy",
+		config = function()
+			local home = vim.fn.expand("$HOME")
+			require("chatgpt").setup({
+				api_key_cmd = "gpg --decrypt " .. home .. "/.config/nvim/chatGPT_API_key.txt.gpg",
+			})
+			vim.keymap.set("n", "<leader>aa", "<cmd>ChatGPT<CR>", { desc = "Open ChatGPT" })
+			vim.keymap.set("n", "<leader>ac", "<cmd>ChatGPTCompleteCode<CR>", { desc = "Complete code with ChatGPT" })
+			vim.keymap.set("n", "<leader>at", "<cmd>ChatGPTRun add_tests<CR>", { desc = "Create tests with ChatGPT" })
+			vim.keymap.set("n", "<leader>ae", "<cmd>ChatGPTRun explain_code<CR>", { desc = "Explain code with ChatGPT" })
+			vim.keymap.set("n", "<leader>af", "<cmd>ChatGPTRun fix_bugs<CR>", { desc = "Fix bugs with ChatGPT" })
+			vim.keymap.set("n", "<leader>ad", "<cmd>ChatGPTRun docstring<CR>", { desc = "Create docstring with ChatGPT" })
+			vim.keymap.set("n", "<leader>ao", "<cmd>ChatGPTRun optimize_code<CR>", { desc = "Optimize code with ChatGPT" })
+			vim.keymap.set("n", "<leader>as", "<cmd>ChatGPTRun summarize<CR>", { desc = "Summarize with ChatGPT" })
+			vim.keymap.set("n", "<leader>aT", "<cmd>ChatGPTRun translate<CR>", { desc = "Translate with ChatGPT" })
+			vim.keymap.set("n", "<leader>ai", "<cmd>ChatGPTEditWithInstructions<CR>", { desc = "Edit with instructions with ChatGPT" })
+		end,
+		dependencies = {
+			"MunifTanjim/nui.nvim",
+			"nvim-lua/plenary.nvim",
+			"folke/trouble.nvim",
+			"nvim-telescope/telescope.nvim"
+		}
+	}
+}

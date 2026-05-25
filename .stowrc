@@ -1,0 +1,3 @@
+--ignore='\.DS_Store'
+--ignore='\.git'
+--ignore='\.stowrc'
