@@ -71,6 +71,11 @@ if ! command -v stow >/dev/null 2>&1; then
     exit 1
 fi
 
+if ! command -v git >/dev/null 2>&1; then
+    echo "Error: Git is not installed."
+    exit 1
+fi
+
 if [[ ! -f ".stowrc" ]]; then
     echo "Warning: no .stowrc found in current directory."
 fi
