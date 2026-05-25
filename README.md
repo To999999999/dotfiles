@@ -1,0 +1,26 @@
+## Bootstrap examples
+
+Requirements:
+- git
+- stow
+
+Clones dotfiles at ~ and uses stow to create links of my dotfiles.
+
+If dotfiles already exist then it's backed with the ".bakfs" extension. 
+
+### For specific dotfiles like nvim and zsh
+```bash
+git clone https://github.com/To999999999/dotfiles.git ~/dotfiles && cd ~/dotfiles && ./force_stow zsh nvim
+```
+### For all my dotfiles
+```bash
+git clone https://github.com/To999999999/dotfiles.git ~/dotfiles && cd ~/dotfiles && ./force_stow .
+```
+### Directly remove existing dotfiles without backing them up
+```bash
+git clone https://github.com/To999999999/dotfiles.git ~/dotfiles && cd ~/dotfiles && ./force_stow -d .
+```
+### Reverse the process and activate the machine's dotfiles back (using the ".bakfs" extensions)
+```bash
+./force_stow -r .
+```
