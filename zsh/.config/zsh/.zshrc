@@ -127,14 +127,6 @@ fi
 alias nvimgpt='gpg --decrypt ~/.config/nvim/chatGPT_API_key.txt.gpg 1>/dev/null 2>/dev/null && nvim "+lua require(\"lazy\").load({plugins={\"ChatGPT.nvim\"}})"'
 
 # =========================================================
-# Vim mode
-# =========================================================
-
-bindkey -v
-
-export KEYTIMEOUT=1
-
-# =========================================================
 # History
 # =========================================================
 
