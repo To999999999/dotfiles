@@ -37,6 +37,7 @@ require("lazy").setup({
 	require("bar_line"),
 	require("lsp_server_stuff"),
 	require("chatGPT"),
+	'christoomey/vim-tmux-navigator', -- ctrl+[hjkl] to move between tmux panes
 })
 
 ------------------------------------------------------------

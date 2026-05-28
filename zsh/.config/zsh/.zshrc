@@ -26,6 +26,11 @@ if command -v fzf >/dev/null 2>&1; then
   source <(fzf --zsh)
 fi
 
+# # zoxide (replaces cd)
+# if command -v zoxide >/dev/null 2>&1; then
+#   eval "$(zoxide init --cmd cd zsh)"
+# fi
+
 # Using nvim as the default editor
 export EDITOR=nvim
 
@@ -103,6 +108,10 @@ zstyle ':completion:*' matcher-list \
   'm:{a-z}={A-Z}' \
   'r:|[._-]=* r:|=*'
 
+# zoxide (replaces cd)
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init --cmd cd zsh)"
+fi
 # =========================================================
 # Plugins
 # =========================================================
