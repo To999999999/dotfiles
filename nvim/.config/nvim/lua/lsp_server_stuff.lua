@@ -7,22 +7,26 @@ return {
 
 	{
 		"williamboman/mason-lspconfig.nvim",
+
 		dependencies = {
 			"williamboman/mason.nvim", -- Mason to manage LSP servers
 			"WhoIsSethDaniel/mason-tool-installer.nvim", -- Tool installer for managing additional tools
-			"hrsh7th/cmp-nvim-lsp", -- Autocompletion for LSP
-			"neovim/nvim-lspconfig", -- Core LSP configuration
-			{ "antosha417/nvim-lsp-file-operations", config = true }, -- Handles file operations like renaming
+			"hrsh7th/cmp-nvim-lsp", -- LSP completion capabilities
+			"neovim/nvim-lspconfig", -- Core LSP config
+			{ "antosha417/nvim-lsp-file-operations", config = true }, -- File operations support
 		},
+
 		config = function()
-			-- Import required plugins
+			----------------------------------------------------------------
+			-- Import plugins
+			----------------------------------------------------------------
 			local mason = require("mason")
 			local mason_lspconfig = require("mason-lspconfig")
 			local mason_tool_installer = require("mason-tool-installer")
 			local cmp_nvim_lsp = require("cmp_nvim_lsp")
 
 			----------------------------------------------------------------
-			-- Setup Mason
+			-- Mason setup
 			----------------------------------------------------------------
 			mason.setup({
 				ui = {
@@ -35,8 +39,7 @@ return {
 			})
 
 			----------------------------------------------------------------
-			-- Setup Mason-LSPConfig (v2): ensure servers are installed
-			-- NOTE: automatic_installation + setup_handlers are removed in v2
+			-- Mason LSP setup
 			----------------------------------------------------------------
 			mason_lspconfig.setup({
 				ensure_installed = {
@@ -47,27 +50,34 @@ return {
 			})
 
 			----------------------------------------------------------------
-			-- Setup Mason-Tool-Installer
+			-- Mason Tool Installer
 			----------------------------------------------------------------
 			mason_tool_installer.setup({
 				ensure_installed = {
-					"prettier", -- prettier formatter
-					"stylua", -- lua formatter
-					"isort", -- python formatter
-					"black", -- python formatter
-					"pylint", -- python linter
+					"prettier",
+					"stylua",
+					"isort",
+					"black",
+					"pylint",
 				},
 			})
 
 			----------------------------------------------------------------
-			-- Setup LSP capabilities and on_attach function
+			-- LSP capabilities
 			----------------------------------------------------------------
 			local capabilities = cmp_nvim_lsp.default_capabilities()
+
+			----------------------------------------------------------------
+			-- LSP keymaps
+			----------------------------------------------------------------
 			local keymap = vim.keymap
-			local opts = { noremap = true, silent = true }
 
 			local on_attach = function(_, bufnr)
-				opts.buffer = bufnr
+				local opts = {
+					noremap = true,
+					silent = true,
+					buffer = bufnr,
+				}
 
 				opts.desc = "Show LSP references"
 				keymap.set("n", "<leader>lr", "<cmd>Telescope lsp_references<CR>", opts)
@@ -97,12 +107,22 @@ return {
 				keymap.set("n", "<leader>lc", vim.diagnostic.open_float, opts)
 
 				opts.desc = "Go to previous diagnostic"
-				keymap.set("n", "<leader>lp", vim.diagnostic.goto_prev, opts)
+				keymap.set("n", "<leader>lp", function()
+					vim.diagnostic.jump({
+						count = -1,
+						float = true,
+					})
+				end, opts)
 
 				opts.desc = "Go to next diagnostic"
-				keymap.set("n", "<leader>ln", vim.diagnostic.goto_next, opts)
+				keymap.set("n", "<leader>ln", function()
+					vim.diagnostic.jump({
+						count = 1,
+						float = true,
+					})
+				end, opts)
 
-				opts.desc = "Show documentation for what is under cursor"
+				opts.desc = "Show documentation under cursor"
 				keymap.set("n", "K", vim.lsp.buf.hover, opts)
 
 				opts.desc = "Restart LSP"
@@ -110,22 +130,26 @@ return {
 			end
 
 			----------------------------------------------------------------
-			-- Neovim 0.11+ native LSP config (replaces setup_handlers)
-			----------------------------------------------------------------
-
 			-- Default config for all servers
+			----------------------------------------------------------------
 			vim.lsp.config("*", {
 				capabilities = capabilities,
 				on_attach = on_attach,
 			})
 
-			-- Custom config for lua_ls
+			----------------------------------------------------------------
+			-- lua_ls specific config
+			----------------------------------------------------------------
 			vim.lsp.config("lua_ls", {
 				capabilities = capabilities,
 				on_attach = on_attach,
+
 				settings = {
 					Lua = {
-						diagnostics = { globals = { "vim" } },
+						diagnostics = {
+							globals = { "vim" },
+						},
+
 						workspace = {
 							library = {
 								[vim.fn.expand("$VIMRUNTIME/lua")] = true,
@@ -137,13 +161,23 @@ return {
 			})
 
 			----------------------------------------------------------------
-			-- Diagnostic symbols in the sign column
+			-- Diagnostics configuration
 			----------------------------------------------------------------
-			local signs = { Error = " ", Warn = " ", Hint = "󰠠 ", Info = " " }
-			for type, icon in pairs(signs) do
-				local hl = "DiagnosticSign" .. type
-				vim.fn.sign_define(hl, { text = icon, texthl = hl, numhl = "" })
-			end
+			vim.diagnostic.config({
+				signs = {
+					text = {
+						[vim.diagnostic.severity.ERROR] = " ",
+						[vim.diagnostic.severity.WARN] = " ",
+						[vim.diagnostic.severity.HINT] = "󰠠 ",
+						[vim.diagnostic.severity.INFO] = " ",
+					},
+				},
+
+				virtual_text = true,
+				underline = true,
+				update_in_insert = false,
+				severity_sort = true,
+			})
 		end,
 	},
 }

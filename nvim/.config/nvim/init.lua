@@ -7,7 +7,7 @@ vim.g.mapleader = " " --Change the leader key (default is \)
 --Add the lazy nvim plugin manager :
 
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-if not vim.loop.fs_stat(lazypath) then
+if vim.fn.isdirectory(lazypath) == 0 then
 	vim.fn.system({
 		"git",
 		"clone",
