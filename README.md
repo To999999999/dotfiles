@@ -14,13 +14,13 @@ git clone https://github.com/To999999999/dotfiles.git ~/dotfiles && cd ~/dotfile
 ```
 ### For all my dotfiles
 ```bash
-git clone https://github.com/To999999999/dotfiles.git ~/dotfiles && cd ~/dotfiles && ./force_stow .
+git clone https://github.com/To999999999/dotfiles.git ~/dotfiles && cd ~/dotfiles && ./force_stow
 ```
 ### Directly remove existing dotfiles without backing them up
 ```bash
-git clone https://github.com/To999999999/dotfiles.git ~/dotfiles && cd ~/dotfiles && ./force_stow -d .
+git clone https://github.com/To999999999/dotfiles.git ~/dotfiles && cd ~/dotfiles && ./force_stow -d
 ```
 ### Reverse the process and activate the machine's dotfiles back (using the ".bakfs" extensions)
 ```bash
-./force_stow -r .
+./force_stow -r
 ```
