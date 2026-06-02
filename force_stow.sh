@@ -30,7 +30,7 @@ usage() {
     cat <<EOF
 Usage:
   force_stow [options] package1 [package2 ...]
-  force_stow [options] .
+  force_stow [options]
 
 Options:
   -d    Delete conflicting files instead of backing them up
