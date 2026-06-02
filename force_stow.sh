@@ -250,12 +250,6 @@ if [[ "$DELETE_MODE" == true && "$RESTORE_MODE" == true ]]; then
     exit 1
 fi
 
-[[ -f ".stowrc" ]] || echo "Warning: no .stowrc found in current directory."
-if [[ $# -eq 0 ]]; then
-    usage
-    exit 1
-fi
-
 # -----------------------------
 # Process the packages
 # -----------------------------
