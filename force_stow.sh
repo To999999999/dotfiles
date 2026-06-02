@@ -127,7 +127,12 @@ expand_packages() {
             -exec basename {} \; \
             | sort
     else
-        printf '%s\n' "$@"
+        local pkg
+
+        for pkg in "$@"; do
+            pkg="${pkg%/}"
+            printf '%s\n' "$pkg"
+        done
     fi
 }
 
