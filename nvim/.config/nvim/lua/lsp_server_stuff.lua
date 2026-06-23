@@ -46,6 +46,7 @@ return {
 					"clangd",
 					"lua_ls",
 					"pyright",
+					"nil_ls",
 				},
 			})
 
@@ -59,6 +60,7 @@ return {
 					"isort",
 					"black",
 					"pylint",
+					"nixpkgs-fmt",
 				},
 			})
 
@@ -155,6 +157,22 @@ return {
 								[vim.fn.expand("$VIMRUNTIME/lua")] = true,
 								[vim.fn.stdpath("config") .. "/lua"] = true,
 							},
+						},
+					},
+				},
+			})
+
+			----------------------------------------------------------------
+			-- nil_ls specific config
+			----------------------------------------------------------------
+			vim.lsp.config("nil_ls", {
+				capabilities = capabilities,
+				on_attach = on_attach,
+
+				settings = {
+					["nil"] = {
+						formatting = {
+							command = { "nixpkgs-fmt" },
 						},
 					},
 				},
