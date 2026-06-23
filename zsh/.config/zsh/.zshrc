@@ -140,6 +140,12 @@ fi
 # Trick to prompt and cache the gpg-agent key password (needed for chatGPT, cause pinetry-curses conflicts with nvim)
 alias nvimgpt='gpg --decrypt ~/.config/nvim/chatGPT_API_key.txt.gpg 1>/dev/null 2>/dev/null && nvim "+lua require(\"lazy\").load({plugins={\"ChatGPT.nvim\"}})"'
 
+#So i can use, the local qwen model very quickly
+if which ollama >/dev/null 2>&1; then
+  alias q='ollama run qwen3-short --think=false'
+  alias qthink='ollama run qwen3-short'
+fi
+
 # =========================================================
 # History
 # =========================================================
