@@ -1,80 +1,151 @@
 return {
-	{
-		"nvim-treesitter/nvim-treesitter",
-			build = ":TSUpdate",
-			config = function()
-				require("nvim-treesitter.configs").setup({
-						-- A list of parser names, or "all"
-						ensure_installed = { "c", "lua", "vim", "vimdoc", "query", "objc", "python", "rust", "javascript" },
+  {
+    "nvim-treesitter/nvim-treesitter",
+    branch = "main",
+    lazy = false,
+    build = ":TSUpdate",
 
-						-- Install parsers synchronously (only applied to `ensure_installed`)
-						sync_install = false,
-						auto_install = true,
-						highlight = {
-						enable = true,
-						},
-						indent = {
-						enable = true,
-						disable = { "python", "javascript", "c", "rust" },
-						},
+    dependencies = {
+      {
+        "nvim-treesitter/nvim-treesitter-textobjects",
+        branch = "main",
+      },
+    },
 
-						incremental_selection = {
-						enable = true,
-						keymaps = {
-						init_selection = "<Leader>ss",
-						node_incremental = "<Leader>si",
-						scope_incremental = "<Leader>sa",
-						node_decremental = "<Leader>sd",
-						},
-						},
+    config = function()
+      local parsers = {
+        "bash",
+        "c",
+        "git_config",
+        "gitcommit",
+        "gitignore",
+        "javascript",
+        "json",
+        "lua",
+        "markdown",
+        "markdown_inline",
+        "nix",
+        "objc",
+        "python",
+        "query",
+        "regex",
+        "rust",
+        "swift",
+        "toml",
+        "vim",
+        "vimdoc",
+        "yaml",
+      }
 
-						textobjects = {
-							select = {
-								enable = true,
+      local has_cli = vim.fn.executable("tree-sitter") == 1
+      local has_compiler =
+        vim.fn.executable("cc") == 1
+        or vim.fn.executable("gcc") == 1
+        or vim.fn.executable("clang") == 1
 
-								-- Automatically jump forward to textobj, similar to targets.vim
-									lookahead = true,
+      local ts = require("nvim-treesitter")
 
-								keymaps = {
-									-- You can use the capture groups defined in textobjects.scm
-									["af"] = "@function.outer",
-									["if"] = "@function.inner",
-									["ac"] = "@class.outer",
-									-- You can optionally set descriptions to the mappings (used in the desc parameter of
-									-- nvim_buf_set_keymap) which plugins like which-key display
-									["ic"] = { query = "@class.inner", desc = "Select inner part of a class region" },
-									-- You can also use captures from other query groups like `locals.scm`
-									["as"] = { query = "@scope", query_group = "locals", desc = "Select language scope" },
-								},
-								-- You can choose the select mode (default is charwise 'v')
-									--
-									-- Can also be a function which gets passed a table with the keys
-									-- * query_string: eg '@function.inner'
-									-- * method: eg 'v' or 'o'
-									-- and should return the mode ('v', 'V', or '<c-v>') or a table
-									-- mapping query_strings to modes.
-									selection_modes = {
-										['@parameter.outer'] = 'v', -- charwise
-											['@function.outer'] = 'V', -- linewise
-												['@class.outer'] = '<c-v>', -- blockwise
-									},
-								-- If you set this to `true` (default is `false`) then any textobject is
-									-- extended to include preceding or succeeding whitespace. Succeeding
-									-- whitespace has priority in order to act similarly to eg the built-in
-									-- `ap`.
-									--
-									-- Can also be a function which gets passed a table with the keys
-									-- * query_string: eg '@function.inner'
-									-- * selection_mode: eg 'v'
-									-- and should return true or false
-									include_surrounding_whitespace = true,
-							},
-						},
-				})
-		end,
-	},
-		-- for now i don't actually use it
-		{
-			"nvim-treesitter/nvim-treesitter-textobjects",
-		},
+      ts.setup({
+        install_dir = vim.fn.stdpath("data") .. "/site",
+      })
+
+      if has_cli and has_compiler then
+        ts.install(parsers)
+      else
+        local missing = {}
+
+        if not has_cli then
+          table.insert(missing, "tree-sitter CLI")
+        end
+
+        if not has_compiler then
+          table.insert(missing, "C compiler")
+        end
+
+        vim.schedule(function()
+          vim.notify(
+            "Treesitter: parser auto-install skipped. Missing: " .. table.concat(missing, ", "),
+            vim.log.levels.INFO,
+            { title = "Treesitter" }
+          )
+        end)
+      end
+
+      vim.api.nvim_create_autocmd("FileType", {
+        callback = function()
+          pcall(vim.treesitter.start)
+
+          pcall(function()
+            vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+          end)
+        end,
+      })
+
+      -- Incremental selection
+      vim.keymap.set("n", "<Leader>ss", function()
+        require("nvim-treesitter.incremental_selection").init_selection()
+      end, { desc = "Treesitter init selection" })
+
+      vim.keymap.set("x", "<Leader>si", function()
+        require("nvim-treesitter.incremental_selection").node_incremental()
+      end, { desc = "Treesitter expand node" })
+
+      vim.keymap.set("x", "<Leader>sa", function()
+        require("nvim-treesitter.incremental_selection").scope_incremental()
+      end, { desc = "Treesitter expand scope" })
+
+      vim.keymap.set("x", "<Leader>sd", function()
+        require("nvim-treesitter.incremental_selection").node_decremental()
+      end, { desc = "Treesitter shrink node" })
+
+      -- Textobjects
+      local ok_textobjects, textobjects = pcall(require, "nvim-treesitter-textobjects")
+
+      if ok_textobjects then
+        textobjects.setup({
+          select = {
+            lookahead = true,
+
+            selection_modes = {
+              ["@parameter.outer"] = "v",
+              ["@function.outer"] = "V",
+              ["@class.outer"] = "<c-v>",
+            },
+
+            include_surrounding_whitespace = true,
+          },
+        })
+
+        local select = require("nvim-treesitter-textobjects.select")
+
+        vim.keymap.set({ "x", "o" }, "af", function()
+          select.select_textobject("@function.outer", "textobjects")
+        end, { desc = "Select outer function" })
+
+        vim.keymap.set({ "x", "o" }, "if", function()
+          select.select_textobject("@function.inner", "textobjects")
+        end, { desc = "Select inner function" })
+
+        vim.keymap.set({ "x", "o" }, "ac", function()
+          select.select_textobject("@class.outer", "textobjects")
+        end, { desc = "Select outer class" })
+
+        vim.keymap.set({ "x", "o" }, "ic", function()
+          select.select_textobject("@class.inner", "textobjects")
+        end, { desc = "Select inner class" })
+
+        vim.keymap.set({ "x", "o" }, "as", function()
+          select.select_textobject("@local.scope", "locals")
+        end, { desc = "Select language scope" })
+      else
+        vim.schedule(function()
+          vim.notify(
+            "Treesitter textobjects skipped: plugin not available",
+            vim.log.levels.INFO,
+            { title = "Treesitter" }
+          )
+        end)
+      end
+    end,
+  },
 }
