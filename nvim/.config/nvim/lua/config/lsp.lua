@@ -20,22 +20,33 @@ local function get_missing_deps(deps)
 	local missing = {}
 
 	for _, dep in ipairs(deps) do
-		if type(dep) == "string" then
+		local t = type(dep)
+
+		if t == "string" then
 			if not has(dep) then
 				table.insert(missing, dep)
 			end
-		else
-			local found = false
 
-			for _, candidate in ipairs(dep) do
-				if has(candidate) then
-					found = true
-					break
+		elseif t == "table" then
+			-- Named custom check
+			if dep.check then
+				if not dep.check() then
+					table.insert(missing, dep.name)
 				end
-			end
+			else
+				-- Alternative executables
+				local found = false
 
-			if not found then
-				table.insert(missing, table.concat(dep, " | "))
+				for _, candidate in ipairs(dep) do
+					if has(candidate) then
+						found = true
+						break
+					end
+				end
+
+				if not found then
+					table.insert(missing, table.concat(dep, " | "))
+				end
 			end
 		end
 	end
@@ -54,8 +65,8 @@ local function notify_unavailable(group, executable, missing_deps)
 		table.insert(missing, "executable: " .. executable)
 	end
 
-	for _, dep in ipairs(missing_deps or {}) do
-		table.insert(missing, "dependency: " .. dep)
+	if missing_deps and #missing_deps > 0 then
+		table.insert(missing, "dependencies: " .. table.concat(missing_deps, ", "))
 	end
 
 	notify_missing(group, missing)
@@ -103,6 +114,18 @@ local NODE_DEPS = {
 local PYTHON_DEPS = {
 	"python3",
 	{ "pip3", "pip" },
+
+	{
+		name = "python3 venv/ensurepip",
+
+		check = function()
+			return vim.fn.system({
+				"python3",
+				"-c",
+				"import venv, ensurepip",
+			}) == ""
+		end,
+	},
 }
 
 local NIX_DEPS = {
