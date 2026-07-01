@@ -27,6 +27,66 @@ local parsers = {
 }
 
 ------------------------------------------------------------
+-- Tree-sitter CLI version check
+------------------------------------------------------------
+
+local minimum_tree_sitter_cli_version = "0.25.0"
+
+local function parse_version(version)
+	local major, minor, patch = version:match("(%d+)%.(%d+)%.(%d+)")
+	return tonumber(major), tonumber(minor), tonumber(patch)
+end
+
+local function version_at_least(current, minimum)
+	local c_major, c_minor, c_patch = parse_version(current)
+	local m_major, m_minor, m_patch = parse_version(minimum)
+
+	if not c_major or not m_major then
+		return false
+	end
+
+	if c_major ~= m_major then
+		return c_major > m_major
+	end
+
+	if c_minor ~= m_minor then
+		return c_minor > m_minor
+	end
+
+	return c_patch >= m_patch
+end
+
+local function tree_sitter_cli_ok()
+	if vim.fn.executable("tree-sitter") ~= 1 then
+		vim.notify(
+			"Tree-sitter parser installation skipped: tree-sitter CLI is not installed. "
+				.. "Required minimum version: "
+				.. minimum_tree_sitter_cli_version,
+			vim.log.levels.WARN,
+			{ title = "Treesitter" }
+		)
+		return false
+	end
+
+	local output = vim.fn.systemlist({ "tree-sitter", "--version" })
+	local version = table.concat(output, " "):match("(%d+%.%d+%.%d+)")
+
+	if not version or not version_at_least(version, minimum_tree_sitter_cli_version) then
+		vim.notify(
+			"Tree-sitter parser installation skipped: tree-sitter CLI version "
+				.. (version or "unknown")
+				.. " is too old. Required minimum version: "
+				.. minimum_tree_sitter_cli_version,
+			vim.log.levels.WARN,
+			{ title = "Treesitter" }
+		)
+		return false
+	end
+
+	return true
+end
+
+------------------------------------------------------------
 -- Treesitter setup
 ------------------------------------------------------------
 
@@ -39,7 +99,9 @@ ts.setup({
 -- Install parsers.
 --
 -- Dependency checks are already done in plugins.lua before this file is loaded.
-ts.install(parsers)
+if tree_sitter_cli_ok() then
+	ts.install(parsers)
+end
 
 ------------------------------------------------------------
 -- Enable Treesitter per filetype
