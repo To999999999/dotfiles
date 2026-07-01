@@ -152,3 +152,16 @@ snacks.input.enable()
 
 -- Replace vim.ui.select() and picker functionality.
 snacks.picker.setup()
+
+-- Notification history creates :Messages(uses snacks) and :message links to it
+vim.api.nvim_create_user_command("Messages", function()
+	snacks.notifier.show_history()
+end, {
+	desc = "Show notification history",
+})
+
+vim.cmd([[
+cnoreabbrev <expr> messages getcmdtype() == ':' && getcmdline() ==# 'messages'
+	\ ? 'Messages'
+	\ : 'messages'
+]])
