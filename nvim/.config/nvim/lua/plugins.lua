@@ -91,7 +91,7 @@ vim.api.nvim_create_autocmd("PackChanged", {
 -- Dependency checks
 ------------------------------------------------------------
 
-local HAS_GIT = check_deps("Git plugins", {
+local HAS_GIT = check_deps("Shared dependency plugins", {
 	"git",
 })
 
@@ -132,6 +132,14 @@ local HAS_CHATGPT = check_deps("ChatGPT plugins", {
 	"git",
 	"curl",
 })
+
+------------------------------------------------------------
+-- Shared dependency plugins
+------------------------------------------------------------
+
+local dependency_plugins = {
+	{ src = gh("nvim-lua/plenary.nvim"), version = "master" }, -- Lua utility dependency used by many plugins
+}
 
 ------------------------------------------------------------
 -- UI plugins
@@ -183,7 +191,6 @@ local git_plugins = {
 local telescope_plugins = {
 	{ src = gh("nvim-telescope/telescope.nvim"), version = "master" }, -- Fuzzy finder
 	{ src = gh("nvim-telescope/telescope-fzf-native.nvim"), version = "main" }, -- Faster Telescope sorter
-	{ src = gh("nvim-lua/plenary.nvim"), version = "master" }, -- Lua utility dependency
 }
 
 ------------------------------------------------------------
@@ -244,6 +251,8 @@ local chatgpt_plugins = {
 ------------------------------------------------------------
 -- Add plugins
 ------------------------------------------------------------
+
+add_group(HAS_GIT, dependency_plugins, pack_opts)
 
 vim.pack.add(ui_plugins, pack_opts)
 vim.pack.add(misc_plugins, pack_opts)
