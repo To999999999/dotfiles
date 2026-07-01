@@ -17,8 +17,6 @@ vim.opt.shiftwidth = 2					    --The amount of space to indent a line (influence
 vim.opt.expandtab = false				    --Transforms tab into spaces
 vim.opt.shiftround = true				    --So doing >> or << (indent to the right/left) will indent by the closest shiftwidth multiple available
 
-vim.opt.clipboard = "unnamedplus"			    --Allows to use the system clipboard
-
 vim.opt.scrolloff = 999					    --Keep the cursor in the middle
 
 vim.opt.virtualedit = "block"				    --Allows to select virtual lines as a block
@@ -34,6 +32,22 @@ vim.opt.signcolumn = 'yes'				    --so we always see the sign column
 
 vim.opt.list = true
 vim.opt.listchars = { tab = '» ', trail = '·', nbsp = '␣' } --see the whitespace characters
+
+-- Use the clipboard natively and in ssh
+local function is_mac()
+  return vim.fn.has("macunix") == 1
+end
+local function is_ssh()
+  return vim.env.SSH_TTY ~= nil or vim.env.SSH_CONNECTION ~= nil
+end
+if is_mac() and not is_ssh() then
+  -- Native macOS Neovim: use pbcopy/pbpaste
+  vim.opt.clipboard = "unnamedplus"
+else
+  -- Remote SSH, e.g. Debian from macOS terminal: use OSC52
+  vim.g.clipboard = "osc52"
+  vim.opt.clipboard = "unnamedplus"
+end
 
 -- Highlight when yanking (copying) text
 vim.api.nvim_create_autocmd('TextYankPost', {
