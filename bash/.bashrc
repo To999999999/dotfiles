@@ -13,6 +13,8 @@ esac
 
 export LANG="en_US.UTF-8"
 
+export PATH="$HOME/.local/bin:$PATH"
+
 # Nix
 if [[ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]]; then
   source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
@@ -127,9 +129,6 @@ if ls --color >/dev/null 2>&1; then
 else
   alias ls='ls -G'
 fi
-
-# ChatGPT preload helper
-alias nvimgpt='gpg --decrypt ~/.config/nvim/chatGPT_API_key.txt.gpg 1>/dev/null 2>/dev/null && nvim "+lua require(\"lazy\").load({plugins={\"ChatGPT.nvim\"}})"'
 
 # =========================================================
 # Vim mode
