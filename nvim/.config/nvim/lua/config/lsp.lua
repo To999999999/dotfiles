@@ -49,7 +49,7 @@ local function check_deps(group, deps)
 end
 
 ------------------------------------------------------------
--- Language dependency checks
+-- Language / tool dependency checks
 ------------------------------------------------------------
 
 local HAS_C_CPP = check_deps("C/C++ LSP support", {
@@ -58,12 +58,24 @@ local HAS_C_CPP = check_deps("C/C++ LSP support", {
 
 local HAS_LUA = true
 
-local HAS_PYTHON = check_deps("Python LSP support", {
+local HAS_PYTHON_TOOLS = check_deps("Python tools", {
 	"python3",
+	{ "pip3", "pip" },
+})
+
+local HAS_PYRIGHT = check_deps("Pyright", {
+	{ "node", "nodejs" },
+	"npm",
 })
 
 local HAS_NIX = check_deps("Nix LSP support", {
 	"nix",
+	"cargo",
+})
+
+local HAS_PRETTIER = check_deps("Prettier", {
+	{ "node", "nodejs" },
+	"npm",
 })
 
 ------------------------------------------------------------
@@ -117,8 +129,11 @@ if HAS_LUA then
 	table.insert(tools, "stylua")
 end
 
-if HAS_PYTHON then
+if HAS_PYRIGHT then
 	table.insert(lsp_servers, "pyright")
+end
+
+if HAS_PYTHON_TOOLS then
 	table.insert(tools, "isort")
 	table.insert(tools, "black")
 	table.insert(tools, "pylint")
@@ -129,7 +144,9 @@ if HAS_NIX then
 	table.insert(tools, "nixpkgs-fmt")
 end
 
-table.insert(tools, "prettier")
+if HAS_PRETTIER then
+	table.insert(tools, "prettier")
+end
 
 ------------------------------------------------------------
 -- Mason LSP setup
