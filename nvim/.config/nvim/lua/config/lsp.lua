@@ -16,7 +16,7 @@ local function notify_missing(group, missing)
 	end)
 end
 
-local function check_deps(group, deps)
+local function get_missing_deps(deps)
 	local missing = {}
 
 	for _, dep in ipairs(deps) do
@@ -40,51 +40,75 @@ local function check_deps(group, deps)
 		end
 	end
 
-	if #missing > 0 then
-		notify_missing(group, missing)
-		return false
+	return missing
+end
+
+local function deps_available(deps)
+	return #get_missing_deps(deps) == 0
+end
+
+local function notify_unavailable(group, executable, missing_deps)
+	local missing = {}
+
+	if executable then
+		table.insert(missing, "executable: " .. executable)
 	end
 
-	return true
+	for _, dep in ipairs(missing_deps or {}) do
+		table.insert(missing, "dependency: " .. dep)
+	end
+
+	notify_missing(group, missing)
 end
 
 local function add_server(server_name, executable, mason_servers, enabled_servers, install_deps)
 	if has(executable) then
 		table.insert(enabled_servers, server_name)
-	elseif install_deps == nil or install_deps then
+		return
+	end
+
+	local missing_deps = get_missing_deps(install_deps or {})
+
+	if #missing_deps == 0 then
 		table.insert(mason_servers, server_name)
 		table.insert(enabled_servers, server_name)
 	else
-		notify_missing(server_name, { executable })
+		notify_unavailable(server_name, executable, missing_deps)
 	end
 end
 
 local function add_tool(tool_name, executable, mason_tools, install_deps)
-	if not has(executable) and (install_deps == nil or install_deps) then
+	if has(executable) then
+		return
+	end
+
+	local missing_deps = get_missing_deps(install_deps or {})
+
+	if #missing_deps == 0 then
 		table.insert(mason_tools, tool_name)
-	elseif not has(executable) then
-		notify_missing(tool_name, { executable })
+	else
+		notify_unavailable(tool_name, executable, missing_deps)
 	end
 end
 
 ------------------------------------------------------------
--- Language / tool dependency checks
+-- Dependency groups
 ------------------------------------------------------------
 
-local HAS_NODE = check_deps("Node.js tools", {
+local NODE_DEPS = {
 	{ "node", "nodejs" },
 	"npm",
-})
+}
 
-local HAS_PYTHON_TOOLS = check_deps("Python tools", {
+local PYTHON_DEPS = {
 	"python3",
 	{ "pip3", "pip" },
-})
+}
 
-local HAS_NIX_TOOLS = check_deps("Nix tools", {
+local NIX_DEPS = {
 	"nix",
 	"cargo",
-})
+}
 
 ------------------------------------------------------------
 -- Neovim Lua development
@@ -136,25 +160,25 @@ local tools = {}
 if has("clangd") then
 	table.insert(enabled_servers, "clangd")
 else
-	notify_missing("C/C++ LSP support", { "clangd" })
+	notify_unavailable("C/C++ LSP support", "clangd", {})
 end
 
 -- Lua
-add_server("lua_ls", "lua-language-server", mason_servers, enabled_servers, true)
-add_tool("stylua", "stylua", tools, true)
+add_server("lua_ls", "lua-language-server", mason_servers, enabled_servers, {})
+add_tool("stylua", "stylua", tools, {})
 
 -- Python
-add_server("pyright", "pyright-langserver", mason_servers, enabled_servers, HAS_NODE)
-add_tool("isort", "isort", tools, HAS_PYTHON_TOOLS)
-add_tool("black", "black", tools, HAS_PYTHON_TOOLS)
-add_tool("pylint", "pylint", tools, HAS_PYTHON_TOOLS)
+add_server("pyright", "pyright-langserver", mason_servers, enabled_servers, NODE_DEPS)
+add_tool("isort", "isort", tools, PYTHON_DEPS)
+add_tool("black", "black", tools, PYTHON_DEPS)
+add_tool("pylint", "pylint", tools, PYTHON_DEPS)
 
 -- Nix
-add_server("nil_ls", "nil", mason_servers, enabled_servers, HAS_NIX_TOOLS)
-add_tool("nixpkgs-fmt", "nixpkgs-fmt", tools, HAS_NIX_TOOLS)
+add_server("nil_ls", "nil", mason_servers, enabled_servers, NIX_DEPS)
+add_tool("nixpkgs-fmt", "nixpkgs-fmt", tools, NIX_DEPS)
 
 -- Web / general formatting
-add_tool("prettier", "prettier", tools, HAS_NODE)
+add_tool("prettier", "prettier", tools, NODE_DEPS)
 
 ------------------------------------------------------------
 -- Mason LSP setup
