@@ -7,7 +7,7 @@ set -u
 # Config
 # -----------------------------
 
-BACKUP_EXT=".bakfs"
+BACKUP_EXT=".bakpdot"
 IGNORE_FILE=".pdotignore"
 
 DELETE_MODE=false
