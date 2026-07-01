@@ -48,34 +48,42 @@ local function check_deps(group, deps)
 	return true
 end
 
+local function add_server(server_name, executable, mason_servers, enabled_servers, install_deps)
+	if has(executable) then
+		table.insert(enabled_servers, server_name)
+	elseif install_deps == nil or install_deps then
+		table.insert(mason_servers, server_name)
+		table.insert(enabled_servers, server_name)
+	else
+		notify_missing(server_name, { executable })
+	end
+end
+
+local function add_tool(tool_name, executable, mason_tools, install_deps)
+	if not has(executable) and (install_deps == nil or install_deps) then
+		table.insert(mason_tools, tool_name)
+	elseif not has(executable) then
+		notify_missing(tool_name, { executable })
+	end
+end
+
 ------------------------------------------------------------
 -- Language / tool dependency checks
 ------------------------------------------------------------
 
-local HAS_C_CPP = check_deps("C/C++ LSP support", {
-	{ "gcc", "cc", "clang" },
+local HAS_NODE = check_deps("Node.js tools", {
+	{ "node", "nodejs" },
+	"npm",
 })
-
-local HAS_LUA = true
 
 local HAS_PYTHON_TOOLS = check_deps("Python tools", {
 	"python3",
 	{ "pip3", "pip" },
 })
 
-local HAS_PYRIGHT = check_deps("Pyright", {
-	{ "node", "nodejs" },
-	"npm",
-})
-
-local HAS_NIX = check_deps("Nix LSP support", {
+local HAS_NIX_TOOLS = check_deps("Nix tools", {
 	"nix",
 	"cargo",
-})
-
-local HAS_PRETTIER = check_deps("Prettier", {
-	{ "node", "nodejs" },
-	"npm",
 })
 
 ------------------------------------------------------------
@@ -114,46 +122,46 @@ mason.setup({
 })
 
 ------------------------------------------------------------
--- Mason packages to install
+-- Mason packages to install / LSP servers to enable
 ------------------------------------------------------------
 
-local lsp_servers = {}
+local mason_servers = {}
+local enabled_servers = {}
 local tools = {}
 
-if HAS_C_CPP then
-	table.insert(lsp_servers, "clangd")
+-- C/C++
+--
+-- clangd is system-only here because Mason does not support clangd
+-- on some ARM platforms.
+if has("clangd") then
+	table.insert(enabled_servers, "clangd")
+else
+	notify_missing("C/C++ LSP support", { "clangd" })
 end
 
-if HAS_LUA then
-	table.insert(lsp_servers, "lua_ls")
-	table.insert(tools, "stylua")
-end
+-- Lua
+add_server("lua_ls", "lua-language-server", mason_servers, enabled_servers, true)
+add_tool("stylua", "stylua", tools, true)
 
-if HAS_PYRIGHT then
-	table.insert(lsp_servers, "pyright")
-end
+-- Python
+add_server("pyright", "pyright-langserver", mason_servers, enabled_servers, HAS_NODE)
+add_tool("isort", "isort", tools, HAS_PYTHON_TOOLS)
+add_tool("black", "black", tools, HAS_PYTHON_TOOLS)
+add_tool("pylint", "pylint", tools, HAS_PYTHON_TOOLS)
 
-if HAS_PYTHON_TOOLS then
-	table.insert(tools, "isort")
-	table.insert(tools, "black")
-	table.insert(tools, "pylint")
-end
+-- Nix
+add_server("nil_ls", "nil", mason_servers, enabled_servers, HAS_NIX_TOOLS)
+add_tool("nixpkgs-fmt", "nixpkgs-fmt", tools, HAS_NIX_TOOLS)
 
-if HAS_NIX then
-	table.insert(lsp_servers, "nil_ls")
-	table.insert(tools, "nixpkgs-fmt")
-end
-
-if HAS_PRETTIER then
-	table.insert(tools, "prettier")
-end
+-- Web / general formatting
+add_tool("prettier", "prettier", tools, HAS_NODE)
 
 ------------------------------------------------------------
 -- Mason LSP setup
 ------------------------------------------------------------
 
 mason_lspconfig.setup({
-	ensure_installed = lsp_servers,
+	ensure_installed = mason_servers,
 })
 
 ------------------------------------------------------------
@@ -262,52 +270,48 @@ vim.lsp.config("*", {
 -- lua_ls config
 ------------------------------------------------------------
 
-if HAS_LUA then
-	vim.lsp.config("lua_ls", {
-		capabilities = capabilities,
-		on_attach = on_attach,
+vim.lsp.config("lua_ls", {
+	capabilities = capabilities,
+	on_attach = on_attach,
 
-		settings = {
-			Lua = {
-				diagnostics = {
-					globals = { "vim" },
-				},
+	settings = {
+		Lua = {
+			diagnostics = {
+				globals = { "vim" },
+			},
 
-				workspace = {
-					library = {
-						[vim.fn.expand("$VIMRUNTIME/lua")] = true,
-						[vim.fn.stdpath("config") .. "/lua"] = true,
-					},
+			workspace = {
+				library = {
+					[vim.fn.expand("$VIMRUNTIME/lua")] = true,
+					[vim.fn.stdpath("config") .. "/lua"] = true,
 				},
 			},
 		},
-	})
-end
+	},
+})
 
 ------------------------------------------------------------
 -- nil_ls config
 ------------------------------------------------------------
 
-if HAS_NIX then
-	vim.lsp.config("nil_ls", {
-		capabilities = capabilities,
-		on_attach = on_attach,
+vim.lsp.config("nil_ls", {
+	capabilities = capabilities,
+	on_attach = on_attach,
 
-		settings = {
-			["nil"] = {
-				formatting = {
-					command = { "nixpkgs-fmt" },
-				},
+	settings = {
+		["nil"] = {
+			formatting = {
+				command = { "nixpkgs-fmt" },
 			},
 		},
-	})
-end
+	},
+})
 
 ------------------------------------------------------------
 -- Enable LSP servers
 ------------------------------------------------------------
 
-vim.lsp.enable(lsp_servers)
+vim.lsp.enable(enabled_servers)
 
 ------------------------------------------------------------
 -- Diagnostics configuration
