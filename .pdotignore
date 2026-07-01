@@ -1,0 +1,5 @@
+--ignore='^\.DS_Store$'
+--ignore='(^|/)\.git(/|$)'
+--ignore='^\.pdotignore$'
+--ignore='^pdot(\.sh)?$'
+--ignore='^README\.md$'
