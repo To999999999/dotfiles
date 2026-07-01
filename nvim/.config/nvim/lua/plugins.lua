@@ -121,6 +121,7 @@ local HAS_LSP = check_deps("LSP plugins", {
 
 local HAS_COMPLETION = check_deps("Completion plugins", {
 	"git",
+	"curl",
 })
 
 local HAS_AI = check_deps("AI plugins", {
