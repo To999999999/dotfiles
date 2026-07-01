@@ -73,16 +73,100 @@ local dynamic_pack_opts = {
 }
 
 ------------------------------------------------------------
+-- Plugin build helpers
+------------------------------------------------------------
+
+local function get_pack_plugin_path(name)
+	for _, plugin in ipairs(vim.pack.get()) do
+		if plugin.spec and plugin.spec.name == name then
+			return plugin.path
+		end
+
+		if plugin.path and plugin.path:match("/" .. name .. "$") then
+			return plugin.path
+		end
+	end
+
+	return nil
+end
+
+local function telescope_fzf_is_built(path)
+	return path and vim.fn.filereadable(path .. "/build/libfzf.so") == 1
+end
+
+local function build_telescope_fzf_sync()
+	local path = get_pack_plugin_path("telescope-fzf-native.nvim")
+
+	if not path then
+		return false
+	end
+
+	if telescope_fzf_is_built(path) then
+		return true
+	end
+
+	vim.notify("Building telescope-fzf-native...", vim.log.levels.INFO, {
+		title = "Neovim plugins",
+	})
+
+	local result = vim.system({ "make" }, { cwd = path }):wait()
+
+	if result.code == 0 then
+		vim.notify("Built telescope-fzf-native successfully", vim.log.levels.INFO, {
+			title = "Neovim plugins",
+		})
+		return true
+	end
+
+	vim.notify(
+		"Failed to build telescope-fzf-native:\n" .. (result.stderr or ""),
+		vim.log.levels.ERROR,
+		{ title = "Neovim plugins" }
+	)
+
+	return false
+end
+
+local function build_telescope_fzf_async(path)
+	if not path or telescope_fzf_is_built(path) then
+		return
+	end
+
+	vim.notify("Building telescope-fzf-native...", vim.log.levels.INFO, {
+		title = "Neovim plugins",
+	})
+
+	vim.system({ "make" }, { cwd = path }, function(result)
+		vim.schedule(function()
+			if result.code == 0 then
+				vim.notify("Built telescope-fzf-native successfully", vim.log.levels.INFO, {
+					title = "Neovim plugins",
+				})
+			else
+				vim.notify(
+					"Failed to build telescope-fzf-native:\n" .. (result.stderr or ""),
+					vim.log.levels.ERROR,
+					{ title = "Neovim plugins" }
+				)
+			end
+		end)
+	end)
+end
+
+------------------------------------------------------------
 -- Plugin build hooks
 ------------------------------------------------------------
 
--- To update/install telescope-fzf-native we need to compile it.
 vim.api.nvim_create_autocmd("PackChanged", {
 	callback = function(event)
-		local data = event.data
+		local data = event.data or {}
+
+		if not data.spec or not data.spec.name then
+			return
+		end
 
 		if data.spec.name == "telescope-fzf-native.nvim" and (data.kind == "install" or data.kind == "update") then
-			vim.system({ "make" }, { cwd = data.path })
+			build_telescope_fzf_async(data.path)
 		end
 	end,
 })
@@ -139,7 +223,7 @@ local HAS_CHATGPT = check_deps("ChatGPT plugins", {
 ------------------------------------------------------------
 
 local dependency_plugins = {
-	{ src = gh("nvim-lua/plenary.nvim"), version = "master" }, -- Lua utility dependency used by many plugins
+	{ src = gh("nvim-lua/plenary.nvim"), version = "master" },
 }
 
 ------------------------------------------------------------
@@ -147,8 +231,8 @@ local dependency_plugins = {
 ------------------------------------------------------------
 
 local ui_plugins = {
-	{ src = gh("projekt0n/github-nvim-theme"), version = "main" }, -- GitHub colorscheme
-	{ src = gh("nvim-lualine/lualine.nvim"), version = "master" }, -- Statusline/winbar
+	{ src = gh("projekt0n/github-nvim-theme"), version = "main" },
+	{ src = gh("nvim-lualine/lualine.nvim"), version = "master" },
 }
 
 ------------------------------------------------------------
@@ -156,11 +240,11 @@ local ui_plugins = {
 ------------------------------------------------------------
 
 local misc_plugins = {
-	{ src = gh("folke/which-key.nvim"), version = "main" }, -- Keymap hints popup
-	{ src = gh("folke/snacks.nvim"), version = "main" }, -- Picker/input/notifier helpers
-	{ src = gh("folke/flash.nvim"), version = "main" }, -- Fast cursor jumping
-	{ src = gh("numToStr/Comment.nvim"), version = "master" }, -- Comment toggling
-	{ src = gh("tpope/vim-surround"), version = "master" }, -- Surround text objects
+	{ src = gh("folke/which-key.nvim"), version = "main" },
+	{ src = gh("folke/snacks.nvim"), version = "main" },
+	{ src = gh("folke/flash.nvim"), version = "main" },
+	{ src = gh("numToStr/Comment.nvim"), version = "master" },
+	{ src = gh("tpope/vim-surround"), version = "master" },
 }
 
 ------------------------------------------------------------
@@ -168,11 +252,11 @@ local misc_plugins = {
 ------------------------------------------------------------
 
 local file_plugins = {
-	{ src = gh("nvim-tree/nvim-tree.lua"), version = "master" }, -- File explorer
-	{ src = gh("nvim-tree/nvim-web-devicons"), version = "master" }, -- File icons
-	{ src = gh("chrishrb/gx.nvim"), version = "main" }, -- Open URLs/files with gx
-	{ src = gh("tpope/vim-sleuth"), version = "master" }, -- Detect indentation settings
-	{ src = gh("christoomey/vim-tmux-navigator"), version = "master" }, -- Navigate tmux panes from Vim
+	{ src = gh("nvim-tree/nvim-tree.lua"), version = "master" },
+	{ src = gh("nvim-tree/nvim-web-devicons"), version = "master" },
+	{ src = gh("chrishrb/gx.nvim"), version = "main" },
+	{ src = gh("tpope/vim-sleuth"), version = "master" },
+	{ src = gh("christoomey/vim-tmux-navigator"), version = "master" },
 }
 
 ------------------------------------------------------------
@@ -180,9 +264,9 @@ local file_plugins = {
 ------------------------------------------------------------
 
 local git_plugins = {
-	{ src = gh("lewis6991/gitsigns.nvim"), version = "main" }, -- Git signs in gutter
-	{ src = gh("NeogitOrg/neogit"), version = "master" }, -- Git interface
-	{ src = gh("sindrets/diffview.nvim"), version = "main" }, -- Git diff views
+	{ src = gh("lewis6991/gitsigns.nvim"), version = "main" },
+	{ src = gh("NeogitOrg/neogit"), version = "master" },
+	{ src = gh("sindrets/diffview.nvim"), version = "main" },
 }
 
 ------------------------------------------------------------
@@ -190,8 +274,8 @@ local git_plugins = {
 ------------------------------------------------------------
 
 local telescope_plugins = {
-	{ src = gh("nvim-telescope/telescope.nvim"), version = "master" }, -- Fuzzy finder
-	{ src = gh("nvim-telescope/telescope-fzf-native.nvim"), version = "main" }, -- Faster Telescope sorter
+	{ src = gh("nvim-telescope/telescope.nvim"), version = "master" },
+	{ src = gh("nvim-telescope/telescope-fzf-native.nvim"), version = "main" },
 }
 
 ------------------------------------------------------------
@@ -199,8 +283,8 @@ local telescope_plugins = {
 ------------------------------------------------------------
 
 local treesitter_plugins = {
-	{ src = gh("nvim-treesitter/nvim-treesitter"), version = "main" }, -- Syntax parsing/highlighting
-	{ src = gh("nvim-treesitter/nvim-treesitter-textobjects"), version = "main" }, -- Treesitter textobjects
+	{ src = gh("nvim-treesitter/nvim-treesitter"), version = "main" },
+	{ src = gh("nvim-treesitter/nvim-treesitter-textobjects"), version = "main" },
 }
 
 ------------------------------------------------------------
@@ -208,12 +292,12 @@ local treesitter_plugins = {
 ------------------------------------------------------------
 
 local lsp_plugins = {
-	{ src = gh("neovim/nvim-lspconfig"), version = "master" }, -- LSP server configs
-	{ src = gh("williamboman/mason.nvim"), version = "main" }, -- External tool installer
-	{ src = gh("williamboman/mason-lspconfig.nvim"), version = "main" }, -- Mason/LSP bridge
-	{ src = gh("WhoIsSethDaniel/mason-tool-installer.nvim"), version = "main" }, -- Ensure tools are installed
-	{ src = gh("folke/neodev.nvim"), version = "main" }, -- LuaLS support for Neovim APIs
-	{ src = gh("antosha417/nvim-lsp-file-operations"), version = "master" }, -- LSP file rename/move support
+	{ src = gh("neovim/nvim-lspconfig"), version = "master" },
+	{ src = gh("williamboman/mason.nvim"), version = "main" },
+	{ src = gh("williamboman/mason-lspconfig.nvim"), version = "main" },
+	{ src = gh("WhoIsSethDaniel/mason-tool-installer.nvim"), version = "main" },
+	{ src = gh("folke/neodev.nvim"), version = "main" },
+	{ src = gh("antosha417/nvim-lsp-file-operations"), version = "master" },
 }
 
 ------------------------------------------------------------
@@ -221,14 +305,14 @@ local lsp_plugins = {
 ------------------------------------------------------------
 
 local completion_plugins = {
-	{ src = gh("hrsh7th/nvim-cmp"), version = "main" }, -- Completion engine
-	{ src = gh("hrsh7th/cmp-buffer"), version = "main" }, -- Buffer completion source
-	{ src = gh("hrsh7th/cmp-path"), version = "main" }, -- Path completion source
-	{ src = gh("hrsh7th/cmp-nvim-lsp"), version = "main" }, -- LSP completion source
-	{ src = gh("L3MON4D3/LuaSnip"), version = "master" }, -- Snippet engine
-	{ src = gh("saadparwaiz1/cmp_luasnip"), version = "master" }, -- LuaSnip completion source
-	{ src = gh("rafamadriz/friendly-snippets"), version = "main" }, -- Snippet collection
-	{ src = gh("Exafunction/codeium.nvim"), version = "main" }, -- Codeium completion source
+	{ src = gh("hrsh7th/nvim-cmp"), version = "main" },
+	{ src = gh("hrsh7th/cmp-buffer"), version = "main" },
+	{ src = gh("hrsh7th/cmp-path"), version = "main" },
+	{ src = gh("hrsh7th/cmp-nvim-lsp"), version = "main" },
+	{ src = gh("L3MON4D3/LuaSnip"), version = "master" },
+	{ src = gh("saadparwaiz1/cmp_luasnip"), version = "master" },
+	{ src = gh("rafamadriz/friendly-snippets"), version = "main" },
+	{ src = gh("Exafunction/codeium.nvim"), version = "main" },
 }
 
 ------------------------------------------------------------
@@ -236,7 +320,7 @@ local completion_plugins = {
 ------------------------------------------------------------
 
 local ai_plugins = {
-	{ src = gh("nickjvandyke/opencode.nvim"), version = "main" }, -- OpenCode integration
+	{ src = gh("nickjvandyke/opencode.nvim"), version = "main" },
 }
 
 ------------------------------------------------------------
@@ -244,9 +328,9 @@ local ai_plugins = {
 ------------------------------------------------------------
 
 local chatgpt_plugins = {
-	{ src = gh("jackMort/ChatGPT.nvim"), version = "main" }, -- ChatGPT commands/UI
-	{ src = gh("MunifTanjim/nui.nvim"), version = "main" }, -- ChatGPT UI dependency
-	{ src = gh("folke/trouble.nvim"), version = "main" }, -- ChatGPT diagnostics dependency
+	{ src = gh("jackMort/ChatGPT.nvim"), version = "main" },
+	{ src = gh("MunifTanjim/nui.nvim"), version = "main" },
+	{ src = gh("folke/trouble.nvim"), version = "main" },
 }
 
 ------------------------------------------------------------
@@ -266,6 +350,10 @@ add_group(HAS_LSP, lsp_plugins, pack_opts)
 add_group(HAS_COMPLETION, completion_plugins, pack_opts)
 add_group(HAS_AI, ai_plugins, pack_opts)
 add_group(HAS_CHATGPT, chatgpt_plugins, dynamic_pack_opts)
+
+if HAS_TELESCOPE then
+	build_telescope_fzf_sync()
+end
 
 ------------------------------------------------------------
 -- Load plugin configuration
