@@ -16,6 +16,7 @@ AUTO_YES=false
 
 DOTFILES_DIR="$(pwd -P)"
 TARGET_DIR="$(cd .. && pwd -P)"
+OS_NAME="$(uname)"
 
 # List of what .pdotignore wants us to ignore
 IGNORE_PATTERNS=()
@@ -126,6 +127,54 @@ is_ignored() {
     return 1
 }
 
+# Check if a package name is an OS-specific package that does not match.
+is_wrong_os_package() {
+    local pkg="$1"
+
+    [[ "$pkg" == pdot_* && "$pkg" != "pdot_$OS_NAME" ]]
+}
+
+# Convert a package-relative path to its target-relative path.
+#
+# Matching OS-specific path parts are removed:
+#   pdot_Darwin/file.txt
+# becomes:
+#   file.txt
+#
+# Non-matching OS-specific path parts are ignored:
+#   pdot_Linux/file.txt
+# on Darwin is skipped.
+normalize_os_path() {
+    local rel="$1"
+    local normalized=""
+    local part
+    local parts
+
+    IFS='/' read -ra parts <<< "$rel"
+
+    for part in "${parts[@]}"; do
+        [[ -z "$part" ]] && continue
+
+        if [[ "$part" == pdot_* ]]; then
+            if [[ "$part" == "pdot_$OS_NAME" ]]; then
+                continue
+            fi
+
+            return 1
+        fi
+
+        if [[ -z "$normalized" ]]; then
+            normalized="$part"
+        else
+            normalized="$normalized/$part"
+        fi
+    done
+
+    [[ -n "$normalized" ]] || return 1
+
+    printf '%s\n' "$normalized"
+}
+
 # List selected packages.
 # If no package is given, use all first-level directories.
 expand_packages() {
@@ -137,7 +186,7 @@ expand_packages() {
             -exec basename {} \; \
             | sort \
             | while IFS= read -r pkg; do
-                if is_ignored "$pkg" || is_ignored "$pkg/"; then
+                if is_ignored "$pkg" || is_ignored "$pkg/" || is_wrong_os_package "$pkg"; then
                     continue
                 fi
 
@@ -154,12 +203,20 @@ expand_packages() {
                 continue
             fi
 
+            if is_wrong_os_package "$pkg"; then
+                echo "Warning: package '$pkg' does not match this OS '$OS_NAME'. Skipping." >&2
+                continue
+            fi
+
             printf '%s\n' "$pkg"
         done
     fi
 }
 
-# List all files for a package.
+# List all file mappings for a package.
+# The first column is the package-relative source path.
+# The second column is the target-relative destination path.
+#
 # The package directory itself is only used for organization.
 #
 # Example:
@@ -167,20 +224,38 @@ expand_packages() {
 #
 # becomes:
 #   .config/nvim/init.lua
-package_files() {
+#
+# Example OS-specific path on Darwin:
+#   shell/pdot_Darwin/.zshrc
+#
+# becomes:
+#   .zshrc
+package_file_mappings() {
     local pkg="$1"
-    local file rel full_rel
+    local file rel full_rel target_rel
 
     find "$pkg" -type f | while IFS= read -r file; do
         rel="${file#${pkg}/}"
         full_rel="$pkg/$rel"
 
-        if is_ignored "$rel" || is_ignored "$full_rel"; then
+        target_rel="$(normalize_os_path "$rel")" || continue
+
+        if is_ignored "$rel" || is_ignored "$full_rel" || is_ignored "$target_rel" || is_ignored "$pkg/$target_rel"; then
             continue
         fi
 
-        printf '%s\n' "$rel"
+        printf '%s\t%s\n' "$rel" "$target_rel"
     done
+}
+
+# List all target-relative files for a package.
+package_files() {
+    local pkg="$1"
+    local src_rel target_rel
+
+    package_file_mappings "$pkg" | while IFS=$'\t' read -r src_rel target_rel; do
+        printf '%s\n' "$target_rel"
+    done | awk '!seen[$0]++'
 }
 
 # List parent directories needed by a package, deepest first.
@@ -298,7 +373,7 @@ handle_existing_destination() {
 # create real directories and symlink only files.
 process_package_apply() {
     local pkg="$1"
-    local relpath src dst
+    local src_rel relpath src dst
 
     echo
     echo "=== Processing package: $pkg ==="
@@ -308,8 +383,8 @@ process_package_apply() {
         return 0
     fi
 
-    while IFS= read -r relpath; do
-        src="$DOTFILES_DIR/$pkg/$relpath"
+    while IFS=$'\t' read -r src_rel relpath; do
+        src="$DOTFILES_DIR/$pkg/$src_rel"
         dst="$TARGET_DIR/$relpath"
 
         [[ -f "$src" ]] || continue
@@ -322,14 +397,14 @@ process_package_apply() {
 
         echo "Linking: $dst -> $src"
         ln -s "$src" "$dst"
-    done < <(package_files "$pkg")
+    done < <(package_file_mappings "$pkg")
 }
 
 # Process a package in reverse:
 # remove package symlinks and restore file backups.
 process_package_restore_files() {
     local pkg="$1"
-    local relpath src dst backup link_target
+    local src_rel relpath src dst backup link_target
 
     echo
     echo "=== Restoring files for package: $pkg ==="
@@ -339,8 +414,8 @@ process_package_restore_files() {
         return 0
     fi
 
-    while IFS= read -r relpath; do
-        src="$DOTFILES_DIR/$pkg/$relpath"
+    while IFS=$'\t' read -r src_rel relpath; do
+        src="$DOTFILES_DIR/$pkg/$src_rel"
         dst="$TARGET_DIR/$relpath"
         backup="$dst$BACKUP_EXT"
 
@@ -357,7 +432,7 @@ process_package_restore_files() {
             echo "Restoring file backup: $backup -> $dst"
             mv "$backup" "$dst"
         fi
-    done < <(package_files "$pkg")
+    done < <(package_file_mappings "$pkg")
 }
 
 # Remove empty directories from the package structure.
