@@ -10,13 +10,26 @@ local function has(cmd)
 	return vim.fn.executable(cmd) == 1
 end
 
+local pending_missing_notifications = {}
+
 local function notify_missing(group, missing)
+	table.insert(pending_missing_notifications, {
+		group = group,
+		missing = missing,
+	})
+end
+
+local function flush_missing_notifications()
 	vim.schedule(function()
-		vim.notify(
-			"Skipping " .. group .. ". Missing: " .. table.concat(missing, ", "),
-			vim.log.levels.WARN,
-			{ title = "Neovim plugins" }
-		)
+		for _, item in ipairs(pending_missing_notifications) do
+			vim.notify(
+				"Skipping " .. item.group .. ". Missing: " .. table.concat(item.missing, ", "),
+				vim.log.levels.WARN,
+				{ title = "Neovim plugins" }
+			)
+		end
+
+		pending_missing_notifications = {}
 	end)
 end
 
@@ -362,6 +375,8 @@ end
 require("config.ui")
 require("config.misc")
 require("config.files")
+
+flush_missing_notifications()
 
 if HAS_GIT then
 	require("config.git")
