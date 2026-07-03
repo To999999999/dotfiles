@@ -130,6 +130,9 @@ else
   alias ls='ls -G'
 fi
 
+# Trick to prompt and cache the gpg-agent key password (needed for chatGPT, cause pinetry-curses conflicts with nvim)
+alias nvimgpt='gpg --decrypt ~/.config/nvim/chatGPT_API_key.txt.gpg 1>/dev/null 2>/dev/null && nvim'
+
 # =========================================================
 # Vim mode
 # =========================================================
