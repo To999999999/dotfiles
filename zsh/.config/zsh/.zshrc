@@ -116,7 +116,11 @@ fi
 # Plugins
 # =========================================================
 
-source "$ZDOTDIR/antidote/antidote.zsh"
+if [[ -f /etc/zsh/antidote.zsh ]]; then
+  source /etc/zsh/antidote.zsh
+else
+  source "$ZDOTDIR/antidote/antidote.zsh"
+fi
 
 antidote load
 
