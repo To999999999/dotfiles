@@ -3,3 +3,5 @@
 # Please adapt and uncomment the following lines:
 	name = Adrien
 	email = 96784564+To999999999@users.noreply.github.com
+[url "git@github.com:"]
+	insteadOf = https://github.com/
