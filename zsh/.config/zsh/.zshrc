@@ -150,6 +150,14 @@ if which ollama >/dev/null 2>&1; then
   alias qthink='ollama run qwen3-short'
 fi
 
+if command -v sops >/dev/null 2>&1 && [ -f /etc/ssh/age.key ]; then
+  alias sops='sudo SOPS_AGE_KEY_FILE=/etc/ssh/age.key sops'
+fi
+
+if command -v darwin-rebuild >/dev/null 2>&1; then
+  alias darwin='sudo darwin-rebuild switch --flake /etc/nix-darwin#mbp'
+fi
+
 # =========================================================
 # History
 # =========================================================

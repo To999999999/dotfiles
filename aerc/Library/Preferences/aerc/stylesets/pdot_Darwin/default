@@ -1,0 +1,76 @@
+# Aerc default theme overrides
+#
+# These values replace the bright-blue selected background with a
+# darker navy background and a high-contrast foreground.
+
+# ---------------------------------------------------------------------------
+# Selected account tab
+# ---------------------------------------------------------------------------
+
+tab.selected.bg = #1e3a5f
+tab.selected.fg = #f8fafc
+tab.selected.bold = true
+
+# ---------------------------------------------------------------------------
+# Selected folder
+# ---------------------------------------------------------------------------
+
+dirlist_default.selected.bg = #1e3a5f
+dirlist_default.selected.fg = #f8fafc
+dirlist_default.selected.bold = true
+
+dirlist_unread.selected.bg = #1e3a5f
+dirlist_unread.selected.fg = #f8fafc
+dirlist_unread.selected.bold = true
+
+dirlist_recent.selected.bg = #1e3a5f
+dirlist_recent.selected.fg = #f8fafc
+dirlist_recent.selected.bold = true
+
+# ---------------------------------------------------------------------------
+# Selected message
+# ---------------------------------------------------------------------------
+
+msglist_default.selected.bg = #1e3a5f
+msglist_default.selected.fg = #f8fafc
+msglist_default.selected.bold = true
+
+msglist_unread.selected.bg = #1e3a5f
+msglist_unread.selected.fg = #f8fafc
+msglist_unread.selected.bold = true
+
+msglist_read.selected.bg = #1e3a5f
+msglist_read.selected.fg = #f8fafc
+msglist_read.selected.bold = true
+
+msglist_result.selected.bg = #1e3a5f
+msglist_result.selected.fg = #f8fafc
+msglist_result.selected.bold = true
+
+msglist_flagged.selected.bg = #1e3a5f
+msglist_flagged.selected.fg = #f8fafc
+msglist_flagged.selected.bold = true
+
+msglist_answered.selected.bg = #1e3a5f
+msglist_answered.selected.fg = #f8fafc
+msglist_answered.selected.bold = true
+
+msglist_forwarded.selected.bg = #1e3a5f
+msglist_forwarded.selected.fg = #f8fafc
+msglist_forwarded.selected.bold = true
+
+msglist_thread_folded.selected.bg = #1e3a5f
+msglist_thread_folded.selected.fg = #f8fafc
+msglist_thread_folded.selected.bold = true
+
+msglist_thread_context.selected.bg = #1e3a5f
+msglist_thread_context.selected.fg = #f8fafc
+msglist_thread_context.selected.bold = true
+
+msglist_thread_orphan.selected.bg = #1e3a5f
+msglist_thread_orphan.selected.fg = #f8fafc
+msglist_thread_orphan.selected.bold = true
+
+msglist_marked.selected.bg = #1e3a5f
+msglist_marked.selected.fg = #f8fafc
+msglist_marked.selected.bold = true
