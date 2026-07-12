@@ -198,7 +198,7 @@ add_tool("pylint", "pylint", tools, PYTHON_DEPS)
 
 -- Nix
 add_server("nil_ls", "nil", mason_servers, enabled_servers, NIX_DEPS)
-add_tool("nixpkgs-fmt", "nixpkgs-fmt", tools, NIX_DEPS)
+add_tool("nixfmt", "nixfmt", tools, NIX_DEPS)
 
 -- Web / general formatting
 add_tool("prettier", "prettier", tools, NODE_DEPS)
@@ -348,7 +348,7 @@ vim.lsp.config("nil_ls", {
 	settings = {
 		["nil"] = {
 			formatting = {
-				command = { "nixpkgs-fmt" },
+				command = { "nixfmt" },
 			},
 		},
 	},
