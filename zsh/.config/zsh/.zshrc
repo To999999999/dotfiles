@@ -141,21 +141,46 @@ else
   alias ls='ls -G'
 fi
 
-# Trick to prompt and cache the gpg-agent key password (needed for chatGPT, cause pinetry-curses conflicts with nvim)
-alias nvimgpt='gpg --decrypt ~/.config/nvim/chatGPT_API_key.txt.gpg 1>/dev/null 2>/dev/null && nvim'
+# Prompt for and cache the GPG key passphrase before starting Neovim.
+alias nvimgpt='gpg --decrypt ~/.config/nvim/chatGPT_API_key.txt.gpg >/dev/null 2>&1 && nvim'
 
-#So i can use, the local qwen model very quickly
-if which ollama >/dev/null 2>&1; then
+# Quickly run local Qwen models.
+if (( $+commands[ollama] )); then
   alias q='ollama run qwen3-short --think=false'
   alias qthink='ollama run qwen3-short'
 fi
 
-if command -v sops >/dev/null 2>&1 && [ -f /etc/ssh/age.key ]; then
+# Use the system age key with sops.
+if (( $+commands[sops] )) && [[ -f /etc/ssh/age.key ]]; then
   alias sops='sudo SOPS_AGE_KEY_FILE=/etc/ssh/age.key sops'
 fi
 
-if command -v darwin-rebuild >/dev/null 2>&1; then
-  alias darwin='sudo darwin-rebuild switch --flake /etc/nix-darwin#mbp'
+# nix-darwin configuration
+NIX_DARWIN_FLAKE='/etc/nix-darwin#mbp'
+NIX_DARWIN_DIR='/etc/nix-darwin'
+
+if (( $+commands[darwin-rebuild] )); then
+  darwin() {
+    sudo darwin-rebuild switch --flake "$NIX_DARWIN_FLAKE"
+  }
+
+  # Update only nixpkgs, then apply the configuration.
+  upgradePkgs() {
+    nix flake update nixpkgs --flake "$NIX_DARWIN_DIR" &&
+      darwin
+  }
+fi
+
+if (( $+commands[darwin-rebuild] && $+commands[brew] )); then
+  # Update all flake inputs, apply nix-darwin, then upgrade Homebrew
+  # formulae and casks. Mac App Store apps are not upgraded here.
+  upgrade() {
+    nix flake update --flake "$NIX_DARWIN_DIR" &&
+      darwin &&
+      brew update &&
+      brew upgrade &&
+      brew upgrade --cask
+  }
 fi
 
 # =========================================================
